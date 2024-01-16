@@ -19,16 +19,28 @@ Program Name: PDF URL Checker
 
 pdfUrlCheck.py - Python script to scrape & verify URLs from PDF files in given directory
 
-changeLog(v1.00.00-beta01):
-    - First version with already working multiprocessing and threading.
-    - Added licensing remarks and GPLv3 required `LICENSING.txt` file. See:
-    https://www.gnu.org/licenses/gpl-howto.html
-    - Added attributions for libraries & others helpful sites.
-    - Added base `ReadMe.md` file.
-    - Added CLI switch to configure HTTP retries.
+changeLog(v1.00-rc02):
+    - Added check for links already tested to avoid adding them to currPdfLinks in scrape().
+    - Fixed link count by incrementing linkNum before uri check. This means all links are counted
+    now, even internal links.
+    - Added code to write results to CSV file.
+    - Fixed bug where URI's were written incorrectly by changing the csv dialect to `unix`.
 
 Thoughts:
-    - Need to rewrite output to CSV to be more sensible 
+    - Started writing code to output to CSV. Quickly realized that we need to capture the filename,
+    page number, & link number in page to add to our data. While testing this, realized that it may
+    see what looks like a single link to one site, as multiple links to the same site. Probably
+    need to have a check for testing of already tested links. Added check.
+    - Now that we are not doing duplicate testing of links, our link count may not increment
+    causing our count to be off if we skip a duplicate. Fixed incrementing of linkNum so that all
+    links are counted.
+    - Found link in `Expert Witness Medical Physics.pdf` that overruns the `Link URI` column,
+    introducing two incorrect columns. Looks like any URI that contains `;` characters are getting
+    delimited into more than one field. Maybe a problem with `csv.writer()`. Another file is
+    `US Obstetrical.pdf`. Both contain `;`, but get 200 status. In both cases the ';' char is seen
+    in the URI, but not in the text of the URI. The csv dialect defines how to handle delimiters.
+    Different dialects can handle data differently. Changing to `unix` dialect fixed.
+    - Need to clean up, update `ReadMe.md` & release `v1.00` final release.
 
 Attributions:
     - Knowledge required for concurrency to work well came from:
@@ -119,6 +131,7 @@ def scrape(currFile):
     full_txt = ''
     print('Scraping {} ...'.format(currFile))
     currPdfLinks = []
+    linksTested = []
 
     # Open file, Iterate thru pages, & extract links
     pdf = fitz.open(sys.argv[1] + os.path.sep + currFile)
@@ -127,13 +140,16 @@ def scrape(currFile):
         linkNum = 0
         for link in page.links():
             linkDict = {}
-            
+            linkNum+=1
             # If external HTTP link, append to link dictionary
-            if 'uri' in link.keys():
+            if 'uri' in link.keys() and link['uri'] not in linksTested:
 
-                linkNum +=1
+                linkDict['fileName'] = currFile
+                linkDict['pageInFile'] = page.number+1
+                linkDict['linkNum'] = linkNum
                 linkDict['linkType'] = 'HTTP Link'
                 linkDict['linkPointsTo'] = link['uri']
+                linksTested.append(link['uri'])
         
             if len(linkDict) != 0:
                 currPdfLinks.append(linkDict)
@@ -201,35 +217,22 @@ def main():
     for currPdfLinks in currPdfLinks.get():
         pdfLinks.append(currPdfLinks)
 
-    print(pdfLinks)
+    # Open `results.csv` for writing
+    with open('results.csv', 'w', newline='') as csvResFile:
+        csvWriter = csv.writer(csvResFile, dialect='unix')
+        
+        # Write column headers
+        csvWriter.writerow(['Filename', 'Page Number', 'Link Number', 'Link Type', 'Link URI', \
+                            'HTTP Status Code Result'])
+    
+        # Iterate thru pdfLinks and write results to `results.csv`.
+        for docPdfLink in pdfLinks:
+            for pdfLink in docPdfLink:
+                csvWriter.writerow([pdfLink['fileName'], pdfLink['pageInFile'], pdfLink[
+                    'linkNum'], pdfLink['linkType'], pdfLink[
+                        'linkPointsTo'], pdfLink['linkStatus']])
 
-    """
-    # Write CSV headers to CSV file
-    with open('headers.csv', 'w', newline='') as csvHdrFile:
-        hdrWriter = csv.writer(csvHdrFile)
-        hdrWriter.writerow(['File', 'Title', 'PP or TS', 'Res/Rev', 'Rom Num', 'Header'])
-   
-        # Iterate thru doc_objects, & headers
-        for o in doc_objects:
-            for h in o['headers']:
-            
-                # Set ppTs variable to value required for PP/TS column
-                if 'PRACTICE PARAMETER' in o['title']:
-                    ppTs = 'PP'
-                elif 'Practice Parameter' in o['title']:
-                    ppTs = 'PP'
-                elif 'TECHNICAL STANDARD' in o['title']:
-                   ppTs = 'TS'
-                else:
-                    ppTs = 'N/A'
-
-                # Write row to CSV file with scraped data
-                hdrWriter.writerow(
-                    [o['file name'], o['title'], ppTs, o['resolution/revision'], h[0], h[1]])
-
-    # Let user know file data is saved to
-    print('Headers have been saved in <headers.csv> ...')
-    """
+    print(currPdfLinks)
 
 # Initiate main()
 if __name__ == "__main__":
