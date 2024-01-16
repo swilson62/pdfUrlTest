@@ -19,7 +19,7 @@ Program Name: PDF URL Checker
 
 pdfUrlCheck.py - Python script to scrape & verify URLs from PDF files in given directory
 
-changeLog(v1.00-rc02):
+changeLog(v1.00-beta02):
     - Added check for links already tested to avoid adding them to currPdfLinks in scrape().
     - Fixed link count by incrementing linkNum before uri check. This means all links are counted
     now, even internal links.
@@ -27,20 +27,9 @@ changeLog(v1.00-rc02):
     - Fixed bug where URI's were written incorrectly by changing the csv dialect to `unix`.
 
 Thoughts:
-    - Started writing code to output to CSV. Quickly realized that we need to capture the filename,
-    page number, & link number in page to add to our data. While testing this, realized that it may
-    see what looks like a single link to one site, as multiple links to the same site. Probably
-    need to have a check for testing of already tested links. Added check.
-    - Now that we are not doing duplicate testing of links, our link count may not increment
-    causing our count to be off if we skip a duplicate. Fixed incrementing of linkNum so that all
-    links are counted.
-    - Found link in `Expert Witness Medical Physics.pdf` that overruns the `Link URI` column,
-    introducing two incorrect columns. Looks like any URI that contains `;` characters are getting
-    delimited into more than one field. Maybe a problem with `csv.writer()`. Another file is
-    `US Obstetrical.pdf`. Both contain `;`, but get 200 status. In both cases the ';' char is seen
-    in the URI, but not in the text of the URI. The csv dialect defines how to handle delimiters.
-    Different dialects can handle data differently. Changing to `unix` dialect fixed.
     - Need to clean up, update `ReadMe.md` & release `v1.00` final release.
+    - If length of switches equals 2, and second switch is integer.....
+    - Might be interesting to also add command line switch for timeout.
 
 Attributions:
     - Knowledge required for concurrency to work well came from:
